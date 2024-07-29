@@ -11,7 +11,7 @@ const v = cy.fmt.v;
 const log = cy.log.scoped(.cli);
 const rt = cy.rt;
 
-const builtins = std.ComptimeStringMap(void, .{
+const builtins = std.StaticStringMap(void).initComptime(.{
     .{"core"},
     .{"math"},
     .{"cy"},
@@ -33,7 +33,7 @@ pub fn create(vm: *cy.VM, r_uri: []const u8) C.Module {
     return mod;
 }
 
-const stdMods = std.ComptimeStringMap(*const fn(*cy.VM, r_uri: []const u8) C.Module, .{
+const stdMods = std.StaticStringMap(*const fn(*cy.VM, r_uri: []const u8) C.Module).initComptime(.{
     .{"cli", create},
     .{"os", os_mod.create},
     .{"test", test_mod.create},

@@ -704,7 +704,7 @@ pub const VM = struct {
                     return error.Panic;
                 }
             } else {
-                const exeRes = try std.ChildProcess.run(.{
+                const exeRes = try std.process.Child.run(.{
                     .allocator = self.alloc,
                     .argv = &.{res.aot.exePath},
                 });
@@ -3415,8 +3415,8 @@ fn spawn(args: struct {
     env_map: ?*const std.process.EnvMap = null,
     max_output_bytes: usize = 50 * 1024,
     expand_arg0: std.posix.Arg0Expand = .no_expand,
-}) !std.ChildProcess.Term {
-    var child = std.ChildProcess.init(args.argv, args.allocator);
+}) !std.process.Child.Term {
+    var child = std.process.Child.init(args.argv, args.allocator);
     child.stdin_behavior = .Ignore;
     child.stdout_behavior = .Inherit;
     child.stderr_behavior = .Inherit;

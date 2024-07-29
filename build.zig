@@ -16,8 +16,8 @@ var trace: bool = undefined;
 var log_mem: bool = undefined;
 var no_cache: bool = undefined;
 var link_test: bool = undefined;
-var optFFI: ?bool = undefined; 
-var optStatic: ?bool = undefined; 
+var optFFI: ?bool = undefined;
+var optStatic: ?bool = undefined;
 var optJIT: ?bool = undefined;
 var optRT: ?config.Runtime = undefined;
 
@@ -56,7 +56,7 @@ pub fn build(b: *std.Build) !void {
 
         const exe = b.addExecutable(.{
             .name = "cyber",
-            .root_source_file = .{ .path = "src/main.zig" },
+            .root_source_file = b.path("src/main.zig"),
             .target = rtarget,
             .optimize = optimize,
         });
@@ -66,16 +66,16 @@ pub fn build(b: *std.Build) !void {
                 exe.root_module.strip = true;
             }
         }
-        exe.addIncludePath(.{ .path = thisDir() ++ "/src" });
+        exe.addIncludePath(b.path("src"));
 
         // Allow dynamic libraries to be loaded by filename in the cwd.
         if (target.os.tag == .linux) {
-            exe.addRPath(.{ .path = ":$ORIGIN"});
+            exe.addRPath(.{ .cwd_relative = ":$ORIGIN" });
             if (target.cpu.arch == .x86_64) {
-                exe.addRPath(.{ .path = "/usr/lib/x86_64-linux-gnu"});
+                exe.addRPath(.{ .cwd_relative = "/usr/lib/x86_64-linux-gnu" });
             }
         } else if (target.os.tag == .macos) {
-            exe.addRPath(.{ .path = "@loader_path"});
+            exe.addRPath(.{ .cwd_relative = "@loader_path" });
         }
 
         // Allow exported symbols in exe to be visible to dlopen.
@@ -84,12 +84,12 @@ pub fn build(b: *std.Build) !void {
         // step.dependOn(&b.addInstallFileWithDir(
         //     exe.getEmittedAsm(), .prefix, "cyber.s",
         // ).step);
-        
+
         const build_options = try createBuildOptions(b, opts);
         const stdx = b.createModule(.{
-            .root_source_file = .{ .path = thisDir() ++ "/src/stdx/stdx.zig" },
+            .root_source_file = b.path("src/stdx/stdx.zig"),
         });
-        try buildAndLinkDeps(&exe.root_module, build_options, stdx, opts);  
+        try buildAndLinkDeps(&exe.root_module, build_options, stdx, opts);
         step.dependOn(&b.addInstallArtifact(exe, .{}).step);
     }
 
@@ -147,7 +147,7 @@ pub fn build(b: *std.Build) !void {
 
         const lib = try buildLib(b, opts);
         for (isystem) |path| {
-            lib.addSystemIncludePath(.{ .path = path });
+            lib.addSystemIncludePath(.{ .cwd_relative = path });
         }
         step.dependOn(&b.addInstallArtifact(lib, .{}).step);
     }
@@ -163,7 +163,7 @@ pub fn build(b: *std.Build) !void {
 
         const lib = b.addExecutable(.{
             .name = "cyber-web",
-            .root_source_file = .{ .path = "src/web.zig" },
+            .root_source_file = b.path("src/web.zig"),
             .target = rtarget,
             .optimize = optimize,
         });
@@ -172,7 +172,7 @@ pub fn build(b: *std.Build) !void {
             // Disable to see better symbols when debugging wasm.
             lib.root_module.strip = true;
         }
-        lib.addIncludePath(.{. path = thisDir() ++ "/src" });
+        lib.addIncludePath(b.path("src"));
 
         if (target.cpu.arch.isWasm()) {
             // Export table so non-exported functions can still be invoked from:
@@ -183,7 +183,7 @@ pub fn build(b: *std.Build) !void {
 
         const build_options = try createBuildOptions(b, opts);
         const stdx = b.createModule(.{
-            .root_source_file = .{ .path = thisDir() ++ "/src/stdx/stdx.zig" },
+            .root_source_file = b.path("src/stdx/stdx.zig"),
         });
 
         try buildAndLinkDeps(&lib.root_module, build_options, stdx, opts);
@@ -276,10 +276,10 @@ pub fn build(b: *std.Build) !void {
 
 fn createAllModule(b: *std.Build, build_options: *std.Build.Module, stdx: *std.Build.Module, opts: Options) !*std.Build.Module {
     const mod = b.createModule(.{
-        .root_source_file = .{ .path = thisDir() ++ "/src/all.zig" },
+        .root_source_file = b.path("src/all.zig"),
         .target = rtarget,
     });
-    mod.addIncludePath(.{ .path = thisDir() ++ "/src" });
+    mod.addIncludePath(b.path("src"));
     try buildAndLinkDeps(mod, build_options, stdx, opts);
     return mod;
 }
@@ -287,7 +287,7 @@ fn createAllModule(b: *std.Build, build_options: *std.Build.Module, stdx: *std.B
 pub fn buildAndLinkDeps(mod: *std.Build.Module, build_options: *std.Build.Module, stdx: *std.Build.Module, opts: Options) !void {
     const b = mod.owner;
 
-    mod.addIncludePath(.{ .path = thisDir() ++ "/src" });
+    mod.addIncludePath(b.path("src"));
     mod.addImport("build_options", build_options);
     mod.addImport("stdx", stdx);
 
@@ -320,7 +320,7 @@ pub fn buildAndLinkDeps(mod: *std.Build.Module, build_options: *std.Build.Module
         });
     } else {
         mod.addAnonymousImport("tcc", .{
-            .root_source_file = .{ .path = thisDir() ++ "/src/tcc_stub.zig" },
+            .root_source_file = b.path("src/tcc_stub.zig"),
         });
         // Disable stack protector since the compiler isn't linking __stack_chk_guard/__stack_chk_fail.
         mod.stack_protector = false;
@@ -332,13 +332,13 @@ pub fn buildAndLinkDeps(mod: *std.Build.Module, build_options: *std.Build.Module
         buildAndLinkLinenoise(b, mod);
     } else {
         mod.addAnonymousImport("linenoise", .{
-            .root_source_file = .{ .path = thisDir() ++ "/src/ln_stub.zig" },
+            .root_source_file = b.path("src/ln_stub.zig"),
         });
     }
 
     if (opts.jit) {
-        // step.addIncludePath(.{ .path = "/opt/homebrew/Cellar/llvm/17.0.1/include" });
-        // step.addLibraryPath(.{ .path = "/opt/homebrew/Cellar/llvm/17.0.1/lib" });
+        // step.addIncludePath(.{ .cwd_relative = "/opt/homebrew/Cellar/llvm/17.0.1/include" });
+        // step.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/Cellar/llvm/17.0.1/lib" });
         // step.linkSystemLibrary("LLVM-17");
     }
 }
@@ -430,10 +430,10 @@ fn createBuildOptions(b: *std.Build, opts: Options) !*std.Build.Module {
     options.addOption(bool, "dev", dev);
     if (dev) {
         options.addOption([]const u8, "version", b.fmt("{s}-DEV", .{Version}));
-        options.addOption([]const u8, "full_version", b.fmt("Cyber {s}-DEV build-{s}-{s}", .{Version, buildTag, commitTag}));
+        options.addOption([]const u8, "full_version", b.fmt("Cyber {s}-DEV build-{s}-{s}", .{ Version, buildTag, commitTag }));
     } else {
         options.addOption([]const u8, "version", Version);
-        options.addOption([]const u8, "full_version", b.fmt("Cyber {s} build-{s}-{s}", .{Version, buildTag, commitTag}));
+        options.addOption([]const u8, "full_version", b.fmt("Cyber {s} build-{s}-{s}", .{ Version, buildTag, commitTag }));
     }
     options.addOption([]const u8, "build", buildTag);
     options.addOption([]const u8, "commit", commitTag);
@@ -457,14 +457,14 @@ fn createBuildOptions(b: *std.Build, opts: Options) !*std.Build.Module {
 fn addUnitTest(b: *std.Build, opts: Options) !*std.Build.Step.Compile {
     const step = b.addTest(.{
         .name = "unit_test",
-        .root_source_file = .{ .path = "./src/unit_test.zig" },
+        .root_source_file = b.path("src/unit_test.zig"),
         .target = rtarget,
         .optimize = optimize,
         .filter = testFilter,
     });
     const build_options = try createBuildOptions(b, opts);
     const stdx = b.createModule(.{
-        .root_source_file = .{ .path = thisDir() ++ "/src/stdx/stdx.zig" },
+        .root_source_file = b.path("src/stdx/stdx.zig"),
     });
     try buildAndLinkDeps(&step.root_module, build_options, stdx, opts);
     return step;
@@ -473,7 +473,7 @@ fn addUnitTest(b: *std.Build, opts: Options) !*std.Build.Step.Compile {
 fn addBehaviorTest(b: *std.Build, opts: Options) !*std.Build.Step.Compile {
     const step = b.addTest(.{
         .name = "test",
-        .root_source_file = .{ .path = "./test/main_test.zig" },
+        .root_source_file = b.path("test/main_test.zig"),
         .target = rtarget,
         .optimize = optimize,
         .filter = testFilter,
@@ -486,7 +486,7 @@ fn addBehaviorTest(b: *std.Build, opts: Options) !*std.Build.Step.Compile {
     step.root_module.addImport("build_options", build_options);
 
     const stdx = b.createModule(.{
-        .root_source_file = .{ .path = thisDir() ++ "/src/stdx/stdx.zig" },
+        .root_source_file = b.path("src/stdx/stdx.zig"),
     });
     step.root_module.addImport("stdx", stdx);
 
@@ -503,12 +503,12 @@ fn addBehaviorTest(b: *std.Build, opts: Options) !*std.Build.Step.Compile {
 fn addTraceTest(b: *std.Build, opts: Options) !*std.Build.Step.Compile {
     const step = b.addTest(.{
         .name = "trace_test",
-        .root_source_file = .{ .path = "./test/trace_test.zig" },
+        .root_source_file = b.path("test/trace_test.zig"),
         .optimize = optimize,
         .target = rtarget,
         .filter = testFilter,
     });
-    step.addIncludePath(.{ .path = thisDir() ++ "/src" });
+    step.addIncludePath(b.path("src"));
 
     var opts_ = opts;
     opts_.trace = true;
@@ -520,7 +520,7 @@ fn addTraceTest(b: *std.Build, opts: Options) !*std.Build.Step.Compile {
     step.root_module.addImport("build_options", build_options);
 
     const stdx = b.createModule(.{
-        .root_source_file = .{ .path = thisDir() ++ "/src/stdx/stdx.zig" },
+        .root_source_file = b.path("src/stdx/stdx.zig"),
     });
     step.root_module.addImport("stdx", stdx);
 
@@ -532,14 +532,9 @@ fn addTraceTest(b: *std.Build, opts: Options) !*std.Build.Step.Compile {
 
 fn is32Bit(target_: std.Target) bool {
     switch (target_.cpu.arch) {
-        .wasm32,
-        .x86 => return true,
+        .wasm32, .x86 => return true,
         else => return false,
     }
-}
-
-inline fn thisDir() []const u8 {
-    return comptime std.fs.path.dirname(@src().file) orelse unreachable;
 }
 
 pub const PrintStep = struct {
@@ -560,7 +555,7 @@ pub const PrintStep = struct {
         };
     }
 
-    fn make(step: *std.Build.Step, _: *std.Progress.Node) anyerror!void {
+    fn make(step: *std.Build.Step, _: std.Progress.Node) anyerror!void {
         const self: *PrintStep = @fieldParentPtr("step", step);
         std.io.getStdOut().writer().writeAll(self.str) catch unreachable;
     }
@@ -618,13 +613,10 @@ pub fn buildCVM(b: *std.Build, opts: Options) !*std.Build.Step.Compile {
     // Note that changing this alone doesn't clear the build cache.
     lib.root_module.sanitize_c = false;
 
-    lib.addIncludePath(.{ .path = thisDir() ++ "/src"});
-    lib.addCSourceFile(.{
-        .file = .{ .path = thisDir() ++ "/src/vm.c" },
-        .flags = cflags.items
-    });
+    lib.addIncludePath(b.path("src"));
+    lib.addCSourceFile(.{ .file = b.path("src/vm.c"), .flags = cflags.items });
     for (isystem) |path| {
-        lib.addSystemIncludePath(.{ .path = path });
+        lib.addSystemIncludePath(.{ .cwd_relative = path });
     }
     return lib;
 }
@@ -634,14 +626,14 @@ fn buildLib(b: *std.Build, opts: Options) !*std.Build.Step.Compile {
     if (opts.static) {
         lib = b.addStaticLibrary(.{
             .name = "cyber",
-            .root_source_file = .{ .path = "src/lib.zig" },
+            .root_source_file = b.path("src/lib.zig"),
             .target = rtarget,
             .optimize = optimize,
         });
     } else {
         lib = b.addSharedLibrary(.{
             .name = "cyber",
-            .root_source_file = .{ .path = "src/lib.zig" },
+            .root_source_file = b.path("src/lib.zig"),
             .target = rtarget,
             .optimize = optimize,
         });
@@ -676,7 +668,7 @@ fn buildLib(b: *std.Build, opts: Options) !*std.Build.Step.Compile {
 
     const build_options = try createBuildOptions(b, opts);
     const stdx = b.createModule(.{
-        .root_source_file = .{ .path = thisDir() ++ "/src/stdx/stdx.zig" },
+        .root_source_file = b.path("src/stdx/stdx.zig"),
     });
     try buildAndLinkDeps(&lib.root_module, build_options, stdx, opts);
     return lib;
@@ -684,9 +676,9 @@ fn buildLib(b: *std.Build, opts: Options) !*std.Build.Step.Compile {
 
 pub fn createLinenoiseModule(b: *std.Build) *std.Build.Module {
     const mod = b.createModule(.{
-        .root_source_file = .{ .path = thisDir() ++ "/lib/linenoise/linenoise.zig" },
+        .root_source_file = b.path("lib/linenoise/linenoise.zig"),
     });
-    mod.addIncludePath(.{ .path = thisDir() ++ "/lib/linenoise" });
+    mod.addIncludePath(b.path("lib/linenoise"));
     return mod;
 }
 
@@ -703,11 +695,11 @@ pub fn buildAndLinkLinenoise(b: *std.Build, mod: *std.Build.Module) void {
 
     var sources = std.ArrayList([]const u8).init(b.allocator);
     sources.appendSlice(&.{
-        "/lib/linenoise/linenoise.c",
+        "lib/linenoise/linenoise.c",
     }) catch @panic("error");
     for (sources.items) |src| {
         lib.addCSourceFile(.{
-            .file = .{ .path = b.fmt("{s}{s}", .{thisDir(), src}) },
+            .file = b.path(src),
             .flags = c_flags.items,
         });
     }

@@ -4,7 +4,7 @@ const tt = stdx.testing;
 const cy = @import("cyber.zig");
 const v = cy.fmt.v;
 
-const keywords = std.ComptimeStringMap(TokenType, .{
+const keywords = std.StaticStringMap(TokenType).initComptime(.{
     .{ "and", .and_k },
     .{ "as", .as_k },
     .{ "await", .await_k },
