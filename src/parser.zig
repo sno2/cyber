@@ -16,7 +16,7 @@ const IndexSlice = cy.IndexSlice(u32);
 
 const dumpParseErrorStackTrace = !cy.isFreestanding and builtin.mode == .Debug and !cy.isWasm and true;
 
-const attributes = std.ComptimeStringMap(cy.ast.AttributeType, .{
+const attributes = std.StaticStringMap(cy.ast.AttributeType).initComptime(.{
     .{ "host", .host },
 });
 

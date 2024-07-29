@@ -640,7 +640,7 @@ pub fn gen(self: *cy.Compiler) !cy.compiler.AotCompileResult {
             return error.TCCError;
         }
     } else {
-        const res = try std.ChildProcess.run(.{
+        const res = try std.process.Child.run(.{
             .allocator = self.alloc,
             .argv = &.{"clang", "-o", exePath, outPath, "zig-out/lib/librt.a"},
         });

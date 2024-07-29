@@ -672,7 +672,7 @@ pub fn execCmd(vm: *cy.VM) anyerror!Value {
         try buf.append(vm.alloc, str);
     }
 
-    const res = try std.ChildProcess.run(.{
+    const res = try std.process.Child.run(.{
         .allocator = vm.alloc,
         .argv = buf.items,
         .max_output_bytes = 1024 * 1024 * 10,
@@ -755,6 +755,9 @@ pub fn writeFile(vm: *cy.VM) anyerror!Value {
     if (!cy.hasStdFiles) return vm.prepPanic("Unsupported.");
     const path = vm.getString(0);
     const content = vm.getString(1);
-    try std.fs.cwd().writeFile(path, content);
+    try std.fs.cwd().writeFile(.{
+        .sub_path = path,
+        .data = content,
+    });
     return Value.Void;
 }
